@@ -3,656 +3,688 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>برنامج البائع (إدارة التحصيل والمبيعات)</title>
+    <title>بيان نقدية جاهز</title>
+    <!-- تحميل Tailwind CSS CDN للأنماط -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- تحميل React و ReactDOM و Babel للتعامل مع JSX -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- تحميل أيقونات Font Awesome -->
+    <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap');
+        /* خط إنتر (Inter) للأناقة */
         body {
-            font-family: 'Cairo', sans-serif;
-            background-color: #f4f7f6;
+            font-family: 'Inter', sans-serif;
         }
-        .action-btn {
-            height: 120px;
-            transition: transform 0.1s;
-        }
-        .action-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-        }
-        .credit-sale { background-color: #ef4444; }
-        .cash-sale { background-color: #f59e0b; }
-        .collection { background-color: #10b981; }
-        .liability { background-color: #3b82f6; }
-        .modal {
-            z-index: 100;
-            background-color: rgba(0, 0, 0, 0.6);
-        }
+
+        /* أنماط طباعة مخصصة لإيصالات الكاشير (Receipt Printer) */
         @media print {
-            body > #app {
-                max-width: none;
-                margin: 0;
-                padding: 0;
-                box-shadow: none;
-                height: auto;
-            }
-            header, nav, .hide-on-print, #report-controls, #export-btn, #nav {
+            /* إخفاء واجهة التطبيق والأزرار عند الطباعة */
+            .hide-on-print, .App-Container > :not(.print-container) {
                 display: none !important;
             }
-            #main-content {
-                padding: 0;
-                overflow: visible;
-                display: block !important;
+            
+            /* إزالة الهوامش من الصفحة للطباعة على بكرات الكاشير */
+            @page {
+                margin: 0; 
             }
-            #report-print-area {
+
+            /* تهيئة منطقة الطباعة بعرض إيصال قياسي (80mm) */
+            .print-container {
                 display: block !important;
-                width: 100%;
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 80mm; 
+                max-width: 80mm;
                 margin: 0;
-                padding: 10mm;
+                padding: 0;
                 box-shadow: none;
-                border: none;
+                background: white;
+                font-family: monospace; /* استخدام خط ثابت (Monospace) لمظهر إيصال كلاسيكي */
+                color: #000;
+            }
+
+            .print-area {
+                padding: 10px; 
+                border: none !important; 
+                box-shadow: none !important;
+            }
+            
+            /* ضمان أن يكون كل النص أسود ومقروء بوضوح في الطباعة الحرارية */
+            .print-area * {
+                color: #000 !important;
+                font-weight: 500 !important; 
+            }
+
+            /* تبسيط صندوق الإجمالي الكلي */
+            .print-total-box { 
+                background-color: transparent !important;
+                border-top: 1px dashed #333 !important;
+                border-bottom: 1px dashed #333 !important;
+                padding: 5px 0 !important;
+                margin-top: 10px !important;
+            }
+
+            .print-item span:first-child, .print-item span:last-child {
+                font-weight: 900 !important; 
+            }
+            
+            body {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
             }
         }
     </style>
 </head>
-<body>
-    <div id="app" class="flex flex-col h-screen max-w-md mx-auto bg-white shadow-xl">
-        <header class="p-4 bg-teal-600 text-white rounded-b-xl shadow-md hide-on-print">
-            <h1 class="text-xl font-black">برنامج البائع</h1>
-            <p id="user-display" class="text-sm mt-1">جاري التحميل...</p>
-        </header>
-        <main id="main-content" class="flex-grow p-4 overflow-y-auto"></main>
-        <nav id="nav" class="flex justify-around items-center border-t border-gray-200 bg-white p-2 shadow-inner sticky bottom-0 hide-on-print" style="display: none;">
-            <button onclick="App.setView('home')" class="nav-item">
-                <svg class="w-6 h-6 mx-auto text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-10v10a1 1 0 001 1h3m-10-9v6a1 1 0 001 1h2a1 1 0 001-1v-6m-4 6h.01"></path></svg>
-                <span class="text-xs text-teal-600">الرئيسية</span>
-            </button>
-            <button onclick="App.setView('reports')" class="nav-item">
-                <svg class="w-6 h-6 mx-auto text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6m0 0h14m-12 0h12m-8-2v-4a2 2 0 012-2h2a2 2 0 012 2v4m-8-6h.01"></path></svg>
-                <span class="text-xs text-gray-500">التقارير</span>
-            </button>
-            <button onclick="App.setView('customers')" class="nav-item">
-                <svg class="w-6 h-6 mx-auto text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20h-2m2 0h-2m-9-2h.01M5 12h.01M17 14l6-6M3 16h10"></path></svg>
-                <span class="text-xs text-gray-500">العملاء</span>
-            </button>
-            <button onclick="App.setView('settings')" class="nav-item">
-                <svg class="w-6 h-6 mx-auto text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 012-2h10a2 2 0 012 2M5 12a2 2 0 00-2 2v1a2 2 0 002 2h14a2 2 0 002-2v-1a2 2 0 00-2-2M12 9V5"></path></svg>
-                <span class="text-xs text-gray-500">المزيد</span>
-            </button>
-        </nav>
-        <div id="lock-screen" class="fixed inset-0 bg-gray-900 flex items-center justify-center transition-opacity duration-300" style="z-index: 1000; display: none;">
-            <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-xs text-center border-t-8 border-teal-500">
-                <h3 class="text-xl font-black mb-4 text-teal-600">التطبيق مغلق</h3>
-                <p class="text-gray-600 mb-6">أدخل كلمة المرور (4 أرقام) للمتابعة.</p>
-                <input type="password" id="unlock-pin-input" maxlength="4" placeholder="••••" class="w-full p-4 text-center text-2xl tracking-widest border border-gray-300 rounded-lg focus:ring-teal-500 focus:border-teal-500">
-                <button onclick="App.attemptUnlock()" class="w-full mt-4 py-3 bg-teal-600 text-white font-bold rounded-lg hover:bg-teal-700 transition">فتح القفل</button>
-                <p id="unlock-error" class="text-red-500 mt-2 text-sm hidden">كلمة المرور غير صحيحة.</p>
-            </div>
-        </div>
-        <div id="modal-container"></div>
-    </div>
+<body class="bg-gray-100">
+    <div id="root"></div>
 
-    <!-- ✅ Firebase SDK - الإصدار الصحيح (compat) -->
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <!-- Firebase SDKs for Firestore and Auth -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, query, onSnapshot, addDoc, serverTimestamp, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-    <script>
-        // تهيئة Firebase
-        const firebaseConfig = {
-            apiKey: "AIzaSyAfNFufQzfRBd5ehUG5oFcATIrGK6lwN80",
-            authDomain: "al-baie.firebaseapp.com",
-            projectId: "al-baie",
-            storageBucket: "al-baie.firebasestorage.app",
-            messagingSenderId: "426680012439",
-            appId: "1:426680012439:web:875c7bd739a3b6912823d2",
-            measurementId: "G-Y54K5H985S"
+        // جعل وظائف Firebase متاحة عالمياً داخل الـ script type="text/babel"
+        window.firebaseImports = {
+            initializeApp, getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged,
+            getFirestore, collection, query, onSnapshot, addDoc, serverTimestamp, setLogLevel
         };
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.firestore();
-        const auth = firebase.auth();
-        db.settings({ experimentalForceLongPolling: true });
-        firebase.firestore.setLogLevel('error');
+    </script>
+    
+    <!-- React Application Logic (using Babel for JSX) -->
+    <script type="text/babel">
+        // استيراد وظائف Firebase من النطاق العالمي (Global Scope)
+        const { 
+            initializeApp, getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged,
+            getFirestore, collection, query, onSnapshot, addDoc, serverTimestamp, setLogLevel
+        } = window.firebaseImports;
 
-        // جعل المتغيرات متاحة عالميًا
-        window.db = db;
-        window.auth = auth;
-        window.FieldValue = firebase.firestore.FieldValue;
-        window.increment = firebase.firestore.FieldValue.increment;
-        window.collection = db.collection.bind(db);
-        window.query = db.collection.bind(db);
-        window.onSnapshot = (ref, onNext, onError) => ref.onSnapshot(onNext, onError);
-        window.addDoc = (ref, data) => ref.add(data);
-        window.doc = db.doc.bind(db);
-        window.getDoc = (ref) => ref.get();
-        window.updateDoc = (ref, data) => ref.update(data);
-        window.deleteDoc = (ref) => ref.delete();
-        window.getDocs = (ref) => ref.get();
-        window.appId = 'al-baie';
+        const { useState, useEffect, useMemo, useCallback, memo } = React;
 
-        // --- باقي الكود (App) ---
-        const App = {
-            state: {
-                view: 'home',
-                userId: null,
-                currentCustomer: null,
-                customers: [],
-                transactions: [],
-                currency: 'جنيه مصري',
-                lockPin: '0000',
-                isLocked: false,
-                userName: '',
-                userPhone: '',
-                reportType: 'Period',
-                reportPeriod: 'Today',
-                reportCustomer: '',
-                reportDateFrom: '',
-                reportDateTo: '',
-                reportData: null,
-                alertMessage: null,
-                isProfileComplete: false
-            },
-            isAuthReady: false,
-            formatCurrency(amount) {
-                return `${Math.abs(amount).toFixed(2)} ${App.state.currency}`;
-            },
-            util: {
-                getStartAndEndDates(period, dateFrom, dateTo) {
-                    const now = new Date();
-                    const start = new Date(now);
-                    start.setHours(0, 0, 0, 0);
-                    const end = new Date(now);
-                    end.setHours(23, 59, 59, 999);
-                    let startDate, endDate;
-                    if (period === 'Today') {
-                        startDate = start;
-                        endDate = end;
-                    } else if (period === 'Yesterday') {
-                        startDate = new Date(start);
-                        startDate.setDate(start.getDate() - 1);
-                        endDate = new Date(end);
-                        endDate.setDate(end.getDate() - 1);
-                    } else if (period === 'CurrentMonth') {
-                        startDate = new Date(start.getFullYear(), start.getMonth(), 1);
-                        endDate = new Date(start.getFullYear(), start.getMonth() + 1, 0, 23, 59, 59, 999);
-                    } else if (period === 'LastMonth') {
-                        startDate = new Date(start.getFullYear(), start.getMonth() - 1, 1);
-                        endDate = new Date(start.getFullYear(), start.getMonth(), 0, 23, 59, 59, 999);
-                    } else if (period === 'LastWeek') {
-                        const day = start.getDay() || 7;
-                        startDate = new Date(start);
-                        startDate.setDate(start.getDate() - day - 6);
-                        startDate.setHours(0, 0, 0, 0);
-                        endDate = new Date(start);
-                        endDate.setDate(start.getDate() - day);
-                        endDate.setHours(23, 59, 59, 999);
-                    } else if (period === 'CustomRange' && dateFrom && dateTo) {
-                        startDate = new Date(dateFrom);
-                        startDate.setHours(0, 0, 0, 0);
-                        endDate = new Date(dateTo);
-                        endDate.setHours(23, 59, 59, 999);
-                    } else {
-                        startDate = new Date(0);
-                        endDate = end;
-                    }
-                    return { start: startDate.toISOString(), end: endDate.toISOString() };
-                },
-                getCustomerName(customerId) {
-                    const customer = App.state.customers.find(c => c.id === customerId);
-                    return customer ? customer.name : 'عميل محذوف';
-                },
-                getCustomerById(customerId) {
-                    return App.state.customers.find(c => c.id === customerId);
-                }
-            },
-            getCollectionPath(collectionName) {
-                if (!App.state.userId) return null;
-                return `artifacts/${window.appId}/users/${App.state.userId}/${collectionName}`;
-            },
-            getSettingsDocRef() {
-                const userId = App.state.userId || 'anonymous';
-                return window.doc(window.db, `artifacts/${window.appId}/users/${userId}/settings/app_settings`);
-            },
-            async loadSettings() {
-                if (!App.isAuthReady || !window.db) return;
+        // --- Firebase Configuration and Initialization ---
+        let db = null;
+        let auth = null;
+        let appId = 'default-app-id';
+        let firebaseConfig = {};
+
+        try {
+            // يتم استخدام هذه المتغيرات في بيئة القماش (Canvas) للتوثيق والإعداد
+            appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+            firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+            if (Object.keys(firebaseConfig).length > 0) {
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                if (db) setLogLevel('debug'); 
+            }
+        } catch (e) {
+            console.error("فشل في تهيئة Firebase:", e);
+        }
+
+        // فئات النقدية بالجنية المصري (EGP)
+        const DENOMINATIONS = [200, 100, 50, 20, 10, 5, 1];
+
+        // دالة مساعدة لإعادة محاولة الاتصال مع تأخير أُسي
+        const withRetry = async (fn, retries = 3, delay = 1000) => {
+            for (let i = 0; i < retries; i++) {
                 try {
-                    const settingsDoc = await window.getDoc(App.getSettingsDocRef());
-                    if (settingsDoc.exists()) {
-                        const settings = settingsDoc.data();
-                        App.state.currency = settings.currency || App.state.currency;
-                        App.state.lockPin = settings.lockPin || App.state.lockPin;
-                        App.state.isLocked = settings.isLocked || App.state.isLocked;
-                        App.state.userName = settings.userName || App.state.userName;
-                        App.state.userPhone = settings.userPhone || App.state.userPhone;
-                        App.state.isProfileComplete = !!(App.state.userName && App.state.userPhone);
-                    }
-                } catch (e) {
-                    console.error("Failed to load settings:", e);
+                    return await fn();
+                } catch (error) {
+                    if (i === retries - 1) throw error;
+                    console.warn(`Retry attempt ${i + 1}/${retries}. Retrying in ${delay}ms...`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    delay *= 2; // تأخير أُسي
                 }
-                if(App.state.isLocked) App.showLockScreen();
-            },
-            async saveSettings() {
-                if (!App.state.userId || !window.db) return;
-                try {
-                    await window.setDoc(App.getSettingsDocRef(), {
-                        currency: App.state.currency,
-                        lockPin: App.state.lockPin,
-                        isLocked: App.state.isLocked,
-                        userName: App.state.userName,
-                        userPhone: App.state.userPhone,
-                        lastUpdated: new Date().toISOString()
-                    }, { merge: true });
-                    App.state.isProfileComplete = !!(App.state.userName && App.state.userPhone);
-                } catch (e) {
-                    console.error("Failed to save settings:", e);
-                    App.showError("فشل حفظ الإعدادات.");
-                }
-            },
-            loadInitialData() {
-                if (!App.isAuthReady || !window.db) return;
-                const customersRef = window.collection(window.db, App.getCollectionPath('customers'));
-                window.onSnapshot(customersRef, (snapshot) => {
-                    const customers = [];
-                    snapshot.forEach(doc => {
-                        customers.push({ id: doc.id, ...doc.data() });
-                    });
-                    App.state.customers = customers;
-                    App.render();
-                }, (error) => {
-                    console.error("Error listening to customers:", error);
-                });
-                const transactionsRef = window.collection(window.db, App.getCollectionPath('transactions'));
-                window.onSnapshot(transactionsRef, (snapshot) => {
-                    const transactions = [];
-                    snapshot.forEach(doc => {
-                        transactions.push({ id: doc.id, ...doc.data() });
-                    });
-                    App.state.transactions = transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
-                    if (App.state.view === 'reports' || App.state.view === 'customer-details') {
-                        App.updateReportData();
-                    }
-                    App.render();
-                }, (error) => {
-                    console.error("Error listening to transactions:", error);
-                });
-            },
-            async deleteAllData(type, pin) {
-                if (pin !== App.state.lockPin) return App.showError("كلمة المرور غير صحيحة.");
-                try {
-                    App.hideModal();
-                    App.showAlert('warning', 'جاري الحذف...');
-                    if (type === 'transactions') {
-                        const transactionsRef = window.collection(window.db, App.getCollectionPath('transactions'));
-                        const transactionsSnapshot = await window.getDocs(transactionsRef);
-                        const transactionDeletes = transactionsSnapshot.docs.map(doc => window.deleteDoc(doc.ref));
-                        await Promise.all(transactionDeletes);
-                        App.showAlert('success', 'تم حذف جميع المعاملات بنجاح.');
-                    } else if (type === 'all') {
-                        const transactionsRef = window.collection(window.db, App.getCollectionPath('transactions'));
-                        const transactionsSnapshot = await window.getDocs(transactionsRef);
-                        const transactionDeletes = transactionsSnapshot.docs.map(doc => window.deleteDoc(doc.ref));
-                        const customersRef = window.collection(window.db, App.getCollectionPath('customers'));
-                        const customersSnapshot = await window.getDocs(customersRef);
-                        const customerDeletes = customersSnapshot.docs.map(doc => window.deleteDoc(doc.ref));
-                        await Promise.all([...transactionDeletes, ...customerDeletes]);
-                        App.showAlert('success', 'تم حذف جميع البيانات بنجاح.');
-                    }
-                } catch (e) {
-                    console.error("Error deleting ", e);
-                    App.showError("فشل الحذف.");
-                }
-            },
-            checkProfileCompletion() {
-                if (!App.state.isProfileComplete) {
-                    App.showUserProfileModal();
-                    return false;
-                }
-                return true;
-            },
-            showUserProfileModal() {
-                const bodyHtml = `
-                    <p class="mb-4">يرجى إدخال بياناتك الأساسية لاستخدام التطبيق:</p>
-                    <label class="block text-sm font-medium text-gray-700">اسم البائع:</label>
-                    <input type="text" id="user-name" value="${App.state.userName}" placeholder="اسمك الكريم" class="w-full p-3 border border-gray-300 rounded-lg mt-1 mb-3">
-                    <label class="block text-sm font-medium text-gray-700">رقم الهاتف:</label>
-                    <input type="tel" id="user-phone" value="${App.state.userPhone}" placeholder="رقم الهاتف" class="w-full p-3 border border-gray-300 rounded-lg mt-1 mb-3">
-                    <button onclick="App.saveUserProfile()" class="w-full bg-teal-600 text-white font-bold py-3 px-4 rounded-lg mt-5 hover:bg-teal-700 transition">
-                        حفظ البيانات
-                    </button>
-                `;
-                App.showModal('بياناتك الأساسية', bodyHtml);
-            },
-            async saveUserProfile() {
-                const name = document.getElementById('user-name').value.trim();
-                const phone = document.getElementById('user-phone').value.trim();
-                if (!name || !phone) {
-                    App.showError("يرجى إدخال الاسم ورقم الهاتف.");
-                    return;
-                }
-                App.state.userName = name;
-                App.state.userPhone = phone;
-                await App.saveSettings();
-                App.hideModal();
-                App.render();
-            },
-            async saveCustomer(name, phone, initialBalance, customerId = null) {
-                if (!App.checkProfileCompletion()) return;
-                const customerData = {
-                    name,
-                    phone: phone || '',
-                    balance: parseFloat(initialBalance) || 0,
-                    lastUpdate: new Date().toISOString()
-                };
-                try {
-                    if (customerId) {
-                        const customerRef = window.doc(window.db, App.getCollectionPath('customers'), customerId);
-                        await window.updateDoc(customerRef, customerData);
-                        App.showAlert('success', 'تم تحديث بيانات العميل.');
-                    } else {
-                        await window.addDoc(window.collection(window.db, App.getCollectionPath('customers')), customerData);
-                        App.showAlert('success', 'تمت إضافة العميل.');
-                    }
-                    App.hideModal();
-                } catch (e) {
-                    console.error("Error saving customer:", e);
-                    App.showError(`فشل حفظ العميل: ${e.message}`);
-                }
-            },
-            async saveTransaction(customerId, amount, type, description) {
-                if (!App.checkProfileCompletion()) return;
-                const amountValue = parseFloat(amount);
-                if (isNaN(amountValue) || amountValue <= 0) return App.showError("المبلغ غير صحيح.");
-                const sign = (type === 'CreditSale' || type === 'Liability') ? 1 : -1;
-                const transactionAmount = amountValue * sign;
-                const transactionData = {
-                    customerId,
-                    amount: amountValue,
-                    type,
-                    description: description || '',
-                    date: new Date().toISOString(),
-                    balanceChange: transactionAmount
-                };
-                try {
-                    await window.addDoc(window.collection(window.db, App.getCollectionPath('transactions')), transactionData);
-                    const customerRef = window.doc(window.db, App.getCollectionPath('customers'), customerId);
-                    await window.updateDoc(customerRef, {
-                        balance: window.increment(transactionAmount),
-                        lastUpdate: new Date().toISOString()
-                    });
-                    App.showAlert('success', `تم تسجيل ${type}.`);
-                    App.hideModal();
-                    App.setView('home');
-                } catch (e) {
-                    console.error("Error saving transaction:", e);
-                    App.showError(`فشل حفظ المعاملة: ${e.message}`);
-                }
-            },
-            renderView(viewName) {
-                let html = '';
-                if (viewName === 'home') {
-                    const totalBalance = App.state.customers.reduce((sum, c) => sum + (c.balance || 0), 0);
-                    const balanceClass = totalBalance >= 0 ? 'text-teal-600' : 'text-red-600';
-                    html += `
-                        <div class="p-2 bg-white rounded-xl shadow-lg mb-6 border-t-4 border-teal-500">
-                            <h2 class="text-lg font-bold text-gray-700 mb-1">إجمالي رصيد الديون</h2>
-                            <p class="text-4xl font-black ${balanceClass}">${App.formatCurrency(totalBalance)}</p>
-                            <p class="text-sm text-gray-500 mt-1">${totalBalance >= 0 ? 'المستحق لك' : 'المستحق عليك'}</p>
-                        </div>
-                        <h2 class="text-lg font-bold mb-4 text-gray-800">العمليات السريعة</h2>
-                        <div class="grid grid-cols-2 gap-4 mb-8">
-                            <button onclick="App.showAddTransactionModal('CreditSale')" class="action-btn credit-sale text-white font-bold p-4 rounded-xl shadow-lg flex flex-col items-center justify-center">
-                                <span class="text-3xl">👈</span>
-                                <span class="mt-2 text-sm md:text-base">بيع آجل</span>
-                            </button>
-                            <button onclick="App.showAddTransactionModal('Collection')" class="action-btn collection text-white font-bold p-4 rounded-xl shadow-lg flex flex-col items-center justify-center">
-                                <span class="text-3xl">💰</span>
-                                <span class="mt-2 text-sm md:text-base">تحصيل نقدية</span>
-                            </button>
-                            <button onclick="App.showAddTransactionModal('CashSale')" class="action-btn cash-sale text-white font-bold p-4 rounded-xl shadow-lg flex flex-col items-center justify-center">
-                                <span class="text-3xl">💵</span>
-                                <span class="mt-2 text-sm md:text-base">بيع نقدي</span>
-                            </button>
-                            <button onclick="App.showAddTransactionModal('Liability')" class="action-btn liability text-white font-bold p-4 rounded-xl shadow-lg flex flex-col items-center justify-center">
-                                <span class="text-3xl">👉</span>
-                                <span class="mt-2 text-sm md:text-base">دين عليك</span>
-                            </button>
-                        </div>
-                        <h2 class="text-lg font-bold mb-3 text-gray-800">آخر 5 معاملات</h2>
-                        ${App.state.transactions.slice(0, 5).map(t => `
-                            <div class="p-3 mb-2 rounded-lg shadow-sm border ${t.type.includes('Sale') ? 'border-red-300' : 'border-green-300'} bg-white flex justify-between items-center" 
-                                onclick="App.setView('customer-details', '${t.customerId}')">
-                                <div>
-                                    <p class="font-bold text-gray-800">${App.util.getCustomerName(t.customerId)}</p>
-                                    <p class="text-xs text-gray-500">${new Date(t.date).toLocaleString('ar-EG', { dateStyle: 'short', timeStyle: 'short' })}</p>
-                                </div>
-                                <div class="text-left">
-                                    <p class="font-bold ${t.type.includes('Sale') || t.type === 'Liability' ? 'text-red-500' : 'text-green-500'}">
-                                        ${t.type === 'CreditSale' ? 'بيع آجل' : t.type === 'CashSale' ? 'بيع نقدي' : t.type === 'Collection' ? 'تحصيل' : 'دين عليك'}
-                                    </p>
-                                    <p class="text-lg font-black">${App.formatCurrency(t.amount)}</p>
-                                </div>
-                            </div>
-                        `).join('')}
-                    `;
-                } else if (viewName === 'customers') {
-                    html += `
-                        <h2 class="text-2xl font-bold mb-4 text-gray-800">قائمة العملاء (${App.state.customers.length})</h2>
-                        <button onclick="App.showAddCustomerModal()" class="w-full bg-teal-600 text-white font-bold py-3 px-4 rounded-xl mb-4 hover:bg-teal-700 transition flex items-center justify-center">
-                            <svg class="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
-                            إضافة عميل جديد
-                        </button>
-                        ${App.state.customers.length === 0 ? '<p class="text-center text-gray-500 mt-10">لا يوجد عملاء.</p>' : ''}
-                        <ul class="space-y-3">
-                            ${App.state.customers.map(c => {
-                                const balanceClass = c.balance >= 0 ? 'text-green-600 bg-green-100' : 'text-red-600 bg-red-100';
-                                return `
-                                    <li onclick="App.setView('customer-details', '${c.id}')" class="bg-white p-4 rounded-xl shadow-lg border-r-4 ${c.balance >= 0 ? 'border-green-500' : 'border-red-500'} flex justify-between items-center cursor-pointer hover:shadow-xl transition">
-                                        <div>
-                                            <p class="text-lg font-bold text-gray-800">${c.name}</p>
-                                            ${c.phone ? `<p class="text-sm text-gray-500">هاتف: ${c.phone}</p>` : ''}
-                                        </div>
-                                        <div class="text-right">
-                                            <span class="font-black text-xl ${balanceClass} py-1 px-3 rounded-full">
-                                                ${App.formatCurrency(c.balance)}
-                                            </span>
-                                            <p class="text-xs text-gray-500 mt-1">${c.balance >= 0 ? 'لك' : 'عليك'}</p>
-                                        </div>
-                                    </li>
-                                `;
-                            }).join('')}
-                        </ul>
-                    `;
-                } else if (viewName === 'customer-details') {
-                    const customer = App.util.getCustomerById(App.state.currentCustomer);
-                    if (!customer) {
-                        html = '<p class="text-center text-red-500 mt-10">العميل غير موجود.</p>';
-                        return;
-                    }
-                    const customerTransactions = App.state.transactions.filter(t => t.customerId === customer.id);
-                    const balanceClass = customer.balance >= 0 ? 'text-teal-600' : 'text-red-600';
-                    html += `
-                        <div class="flex justify-between items-start mb-4">
-                            <h2 class="text-2xl font-bold text-gray-800">${customer.name}</h2>
-                            <button onclick="App.showAddCustomerModal('${customer.id}')" class="text-sm text-teal-600 font-bold hover:text-teal-800">
-                                تعديل 
-                            </button>
-                        </div>
-                        <div class="p-4 bg-white rounded-xl shadow-lg mb-6 border-t-4 border-teal-500">
-                            <h3 class="text-lg font-bold text-gray-700 mb-1">الرصيد الحالي</h3>
-                            <p class="text-4xl font-black ${balanceClass}">${App.formatCurrency(customer.balance)}</p>
-                            <p class="text-sm text-gray-500 mt-1">${customer.balance >= 0 ? 'المستحق لك' : 'المستحق عليه'}</p>
-                            ${customer.phone ? `<p class="text-sm text-gray-600 mt-2">الهاتف: ${customer.phone}</p>` : ''}
-                        </div>
-                        <h3 class="text-lg font-bold mb-3 text-gray-800">سجل المعاملات (${customerTransactions.length})</h3>
-                        <div class="grid grid-cols-2 gap-3 mb-4">
-                            <button onclick="App.showAddTransactionModal('CreditSale', '${customer.id}')" class="bg-red-500 text-white font-bold p-3 rounded-xl hover:bg-red-600 transition">دين جديد</button>
-                            <button onclick="App.showAddTransactionModal('Collection', '${customer.id}')" class="bg-green-500 text-white font-bold p-3 rounded-xl hover:bg-green-600 transition">تحصيل مبلغ</button>
-                        </div>
-                        ${customerTransactions.length === 0 ? '<p class="text-center text-gray-500 mt-10">لا توجد معاملات.</p>' : ''}
-                        <ul class="space-y-3">
-                            ${customerTransactions.map(t => `
-                                <li class="bg-white p-3 rounded-xl shadow-sm border-r-4 ${t.type.includes('Sale') || t.type === 'Liability' ? 'border-red-400' : 'border-green-400'} flex justify-between items-center">
-                                    <div>
-                                        <p class="font-bold text-gray-800">
-                                            ${t.type === 'CreditSale' ? 'بيع آجل' : t.type === 'CashSale' ? 'بيع نقدي' : t.type === 'Collection' ? 'تحصيل' : 'دين عليك'}
-                                        </p>
-                                        <p class="text-xs text-gray-500">${new Date(t.date).toLocaleString('ar-EG', { dateStyle: 'short', timeStyle: 'short' })}</p>
-                                        ${t.description ? `<p class="text-xs text-gray-600 mt-1">الملاحظات: ${t.description}</p>` : ''}
-                                    </div>
-                                    <div class="text-left">
-                                        <p class="text-lg font-black ${t.type.includes('Sale') || t.type === 'Liability' ? 'text-red-500' : 'text-green-500'}">
-                                            ${t.type === 'CreditSale' || t.type === 'Liability' ? '+' : '-'} ${App.formatCurrency(t.amount)}
-                                        </p>
-                                    </div>
-                                </li>
-                            `).join('')}
-                        </ul>
-                    `;
-                } else if (viewName === 'reports') {
-                    const report = App.state.reportData;
-                    if (!report) {
-                        html = '<p class="text-center text-gray-500 mt-10">جاري تحميل التقرير...</p>';
-                    } else {
-                        html += `
-                            <h2 class="text-2xl font-bold mb-4 text-gray-800 hide-on-print">تقارير المبيعات والتحصيل</h2>
-                            <div id="report-controls" class="bg-white p-4 rounded-xl shadow-lg mb-6 hide-on-print">
-                                <label class="block text-sm font-medium text-gray-700 mb-2">نوع التقرير:</label>
-                                <select onchange="App.handleReportChange('type', this.value)" class="w-full p-2 border border-gray-300 rounded-lg mb-3">
-                                    <option value="Period" ${App.state.reportType === 'Period' ? 'selected' : ''}>حسب الفترة الزمنية</option>
-                                    <option value="Customer" ${App.state.reportType === 'Customer' ? 'selected' : ''}>حسب العميل</option>
-                                </select>
-                                ${App.state.reportType === 'Period' ? App.renderPeriodSelector() : App.renderCustomerSelector()}
-                            </div>
-                            <button id="export-btn" onclick="window.print()" class="w-full bg-teal-600 text-white font-bold py-3 px-4 rounded-xl mb-6 hover:bg-teal-700 transition hide-on-print">
-                                طباعة/تصدير كـ PDF
-                            </button>
-                            <div id="report-print-area" class="p-4 bg-white rounded-xl shadow-lg">
-                                <h3 class="text-xl font-bold mb-4 text-teal-600 border-b pb-2">ملخص التقرير</h3>
-                                ${App.renderReportSummary(report)}
-                                <h3 class="text-lg font-bold mt-6 mb-3 text-gray-800">قائمة المعاملات (${report.filteredTransactions.length})</h3>
-                                ${report.filteredTransactions.length === 0 ? '<p class="text-center text-gray-500 mt-4">لا توجد معاملات.</p>' : App.renderTransactionList(report.filteredTransactions)}
-                            </div>
-                        `;
-                    }
-                } else if (viewName === 'settings') {
-                    html += `
-                        <h2 class="text-2xl font-bold mb-6 text-gray-800">الإعدادات والمزيد</h2>
-                        <div class="bg-white p-5 rounded-xl shadow-lg mb-6 border-t-4 border-teal-500">
-                            <h3 class="text-lg font-bold mb-3 text-teal-600">معلومات المستخدم</h3>
-                            <label class="block text-sm font-medium text-gray-700 mt-3">اسم البائع:</label>
-                            <input type="text" id="setting-user-name" value="${App.state.userName}" placeholder="اسمك الكريم" class="w-full p-3 border border-gray-300 rounded-lg mt-1 focus:ring-teal-500 focus:border-teal-500">
-                            <label class="block text-sm font-medium text-gray-700 mt-3">رقم الهاتف:</label>
-                            <input type="tel" id="setting-user-phone" value="${App.state.userPhone}" placeholder="للتواصل" class="w-full p-3 border border-gray-300 rounded-lg mt-1 focus:ring-teal-500 focus:border-teal-500">
-                            <label class="block text-sm font-medium text-gray-700 mt-3">العملة:</label>
-                            <input type="text" id="setting-currency" value="${App.state.currency}" class="w-full p-3 border border-gray-300 rounded-lg mt-1 focus:ring-teal-500 focus:border-teal-500">
-                            <button onclick="App.saveUserAndCurrencySettings()" class="w-full bg-teal-600 text-white font-bold py-3 px-4 rounded-xl mt-5 hover:bg-teal-700 transition">
-                                حفظ معلومات المستخدم
-                            </button>
-                        </div>
-                        <div class="bg-white p-5 rounded-xl shadow-lg mb-6">
-                            <h3 class="text-lg font-bold mb-3 text-red-600">الأمان</h3>
-                            <label class="block text-sm font-medium text-gray-700 mt-3">كلمة المرور (4 أرقام):</label>
-                            <input type="password" id="setting-lock-pin" value="${App.state.lockPin}" maxlength="4" placeholder="••••" class="w-full p-3 text-center text-xl tracking-widest border border-gray-300 rounded-lg mt-1 focus:ring-red-500 focus:border-red-500">
-                            <div class="flex items-center mt-4">
-                                <input type="checkbox" id="setting-is-locked" ${App.state.isLocked ? 'checked' : ''} class="h-4 w-4 text-red-600 border-gray-300 rounded focus:ring-red-500 ml-2">
-                                <label for="setting-is-locked" class="text-sm font-medium text-gray-700">تفعيل شاشة القفل</label>
-                            </div>
-                            <button onclick="App.saveSecuritySettings()" class="w-full bg-red-600 text-white font-bold py-3 px-4 rounded-xl mt-5 hover:bg-red-700 transition">
-                                حفظ إعدادات الأمان
-                            </button>
-                            <button onclick="App.showDeleteAllConfirm()" class="w-full text-sm text-red-500 hover:text-red-700 font-bold mt-5 py-2 border border-red-300 rounded-xl transition">
-                                حذف جميع البيانات
-                            </button>
-                        </div>
-                        <p class="text-xs text-center text-gray-400 mt-8">معرّف التطبيق: ${window.appId}</p>
-                    `;
-                }
-                document.getElementById('main-content').innerHTML = html;
-            },
-            showDeleteAllConfirm() {
-                const bodyHtml = `
-                    <p class="font-bold text-red-600">تحذير: لا يمكن التراجع!</p>
-                    <p class="mt-2 text-sm text-gray-700">اختر نوع الحذف:</p>
-                    <button onclick="App.deleteAllData('transactions', '${App.state.lockPin}')" class="w-full mt-3 py-2 bg-yellow-500 text-white rounded-lg">حذف جميع المعاملات فقط</button>
-                    <button onclick="App.deleteAllData('all', '${App.state.lockPin}')" class="w-full mt-2 py-2 bg-red-500 text-white rounded-lg">حذف جميع العملاء والمعاملات</button>
-                    <p class="mt-3 text-sm text-gray-600">سيتم طلب كلمة المرور للتأكيد.</p>
-                `;
-                App.showModal('حذف جميع البيانات', bodyHtml);
-            },
-            setView(viewName, customerId = null) {
-                App.state.view = viewName;
-                App.state.currentCustomer = customerId;
-                if (viewName === 'reports') {
-                    App.updateReportData();
-                }
-                App.render();
-                document.getElementById('main-content').scrollTop = 0;
-            },
-            render() {
-                if (!App.isAuthReady) {
-                    document.getElementById('main-content').innerHTML = '<p class="text-center text-gray-500 mt-20">جاري التحميل...</p>';
-                    return;
-                }
-                App.renderView(App.state.view);
-            },
-            showAlert(type, message) {
-                App.state.alertMessage = { type, message };
-                App.render();
-                setTimeout(() => {
-                    App.state.alertMessage = null;
-                    App.render();
-                }, 3000);
-            },
-            showError(message) {
-                App.showAlert('error', message);
-            },
-            showModal(title, bodyHtml) {
-                const modalHtml = `
-                    <div class="modal fixed inset-0 flex items-center justify-center p-4">
-                        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6">
-                            <h3 class="text-xl font-bold mb-4 border-b pb-2 text-teal-600">${title}</h3>
-                            <div class="modal-body mb-4 text-gray-700">${bodyHtml}</div>
-                            <div class="flex justify-end space-x-2 space-x-reverse">
-                                <button onclick="App.hideModal()" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-400 transition">إغلاق</button>
-                            </div>
-                        </div>
-                    </div>
-                `;
-                document.getElementById('modal-container').innerHTML = modalHtml;
-            },
-            hideModal() {
-                document.getElementById('modal-container').innerHTML = '';
-            },
-            initAuth() {
-                auth.onAuthStateChanged(async (user) => {
-                    if (!user) {
-                        try {
-                            const result = await auth.signInAnonymously();
-                            const newUser = result.user;
-                            window.userId = newUser.uid;
-                            App.state.userId = newUser.uid;
-                            document.getElementById('user-display').textContent = "مرحباً!";
-                            App.isAuthReady = true;
-                            App.loadInitialData();
-                            App.loadSettings();
-                        } catch (error) {
-                            console.error("فشل تسجيل الدخول المجهول:", error);
-                            App.showError("فشل الاتصال بقاعدة البيانات.");
-                        }
-                    } else {
-                        window.userId = user.uid;
-                        App.state.userId = user.uid;
-                        document.getElementById('user-display').textContent = "مرحباً!";
-                        App.isAuthReady = true;
-                        App.loadInitialData();
-                        App.loadSettings();
-                    }
-                });
             }
         };
 
-        window.onload = function () {
-            App.initAuth();
+        // --- مكون إدخال الفئة النقدية ---
+        const DenominationInput = memo(({ denominationValue, count, total, handleCountChange }) => {
+            
+            const displayValue = count === 0 ? '' : String(count);
+
+            return (
+                <div className="flex items-center bg-gray-50 p-3 rounded-lg border">
+                    <span className="text-lg font-bold w-1/4 text-blue-800 text-right">{denominationValue} ج.م</span>
+                    <div className="w-1/2 px-2">
+                        <input
+                            type="text"
+                            inputMode="numeric"
+                            value={displayValue}
+                            onChange={(e) => handleCountChange(denominationValue, e.target.value)}
+                            placeholder="العدد"
+                            className="w-full text-center p-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:ring-blue-500 transition-shadow"
+                        />
+                    </div>
+                    <div className="w-1/4 text-left text-lg font-semibold text-green-700">
+                        {total.toLocaleString('ar-EG')}
+                    </div>
+                </div>
+            );
+        });
+        DenominationInput.displayName = 'DenominationInput';
+
+        // --- مكون إدخال اسم المندوب ---
+        const AgentNameInput = memo(({ agentName, setAgentName }) => {
+            return (
+                <label className="block mt-4">
+                    <span className="text-sm font-medium text-gray-700">اسم المندوب (مطلوب)</span>
+                    <input
+                        type="text"
+                        value={agentName}
+                        onChange={(e) => setAgentName(e.target.value)}
+                        placeholder="أدخل الاسم هنا"
+                        className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm p-3 text-lg text-center border focus:border-blue-500 focus:ring-blue-500 transition-colors"
+                        required
+                    />
+                </label>
+            );
+        });
+        AgentNameInput.displayName = 'AgentNameInput';
+
+
+        // --- مكون علامة تبويب العد ---
+        const MemoizedCountTab = memo(({
+            agentName, 
+            setAgentName,
+            totalDenominations, 
+            grandTotal, 
+            handleCountChange, 
+            handleSaveAndPrint, 
+            resetForm, 
+            message
+        }) => {
+            const now = new Date();
+            const currentDate = now.toLocaleDateString('ar-EG');
+            const currentTime = now.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+
+            const isGrandTotalZero = grandTotal === 0;
+            const isAgentNameMissing = !agentName.trim();
+            const isDisabled = isGrandTotalZero || isAgentNameMissing;
+
+            let buttonText;
+            let buttonIcon;
+            if (isDisabled) {
+                buttonIcon = "lock";
+                if (isAgentNameMissing) {
+                    buttonText = "الرجاء إدخال اسم المندوب";
+                } else if (isGrandTotalZero) {
+                    buttonText = "الإجمالي $0$: الرجاء إدخال بيانات العد";
+                }
+            } else {
+                buttonIcon = "print";
+                buttonText = "حفظ وطباعة";
+            }
+
+            return (
+                <div className="p-4 space-y-4">
+                    {/* بطاقة البيانات الوصفية */}
+                    <div className="bg-white p-4 rounded-xl shadow-lg border border-gray-200">
+                        <div className="grid grid-cols-2 gap-3 text-sm text-gray-600">
+                            <div><i className="fas fa-calendar-alt ml-1 text-blue-500"></i> <span className="font-semibold">التاريخ:</span> {currentDate}</div>
+                            <div><i className="fas fa-clock ml-1 text-blue-500"></i> <span className="font-semibold">الوقت:</span> {currentTime}</div>
+                        </div>
+                        
+                        {/* إدخال اسم المندوب */}
+                        <AgentNameInput agentName={agentName} setAgentName={setAgentName} />
+                    </div>
+
+                    {/* مدخلات فئات النقدية */}
+                    <div className="bg-white p-4 rounded-xl shadow-lg border border-gray-200">
+                        <h2 className="text-xl font-bold mb-3 text-blue-600 border-b pb-2">فئات النقدية (ج.م)</h2>
+                        <div className="space-y-3">
+                            {totalDenominations.map(({ value, count, total }) => (
+                                <DenominationInput 
+                                    key={value}
+                                    denominationValue={value}
+                                    count={count}
+                                    total={total}
+                                    handleCountChange={handleCountChange}
+                                />
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* عرض الإجمالي الكلي */}
+                    <div className="bg-green-600 text-white p-4 rounded-xl shadow-2xl flex justify-between items-center mt-5">
+                        <span className="text-xl font-extrabold">الإجمالي الكلي:</span>
+                        <span className="text-3xl font-extrabold">{grandTotal.toLocaleString('ar-EG')} ج.م</span>
+                    </div>
+
+                    {/* الإجراءات */}
+                    {message && (
+                        <div className={`p-3 text-center rounded-lg font-medium ${message.includes('نجاح') ? 'bg-green-100 text-green-700' : message.includes('فشل') || message.includes('الرجاء') || message.includes('خطأ') ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>
+                            {message}
+                        </div>
+                    )}
+                    <div className="flex gap-3 pt-2">
+                        <button
+                            onClick={handleSaveAndPrint}
+                            disabled={isDisabled}
+                            className="flex-1 p-4 bg-yellow-500 text-blue-900 rounded-xl font-bold text-xl shadow-lg transition-all hover:bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.01]"
+                        >
+                            <i className={`fas fa-${buttonIcon} ml-2`}></i> {buttonText}
+                        </button>
+                        <button
+                            onClick={resetForm}
+                            className="p-4 bg-gray-300 text-gray-700 rounded-xl font-bold text-lg shadow-lg transition-all hover:bg-gray-400"
+                        >
+                            <i className="fas fa-redo"></i>
+                        </button>
+                    </div>
+                </div>
+            );
+        });
+        MemoizedCountTab.displayName = 'MemoizedCountTab';
+
+        // --- مكون عرض الطباعة ---
+        const PrintView = ({ transaction, resetPrintStateAndForm }) => { 
+            if (!transaction) return null;
+
+            const denominationsList = transaction.denominations
+                .filter(d => d.count > 0)
+                .map(d => (
+                    <div key={d.value} className="flex justify-between py-1 text-sm border-b border-dashed border-gray-400 print-item">
+                        <span className="w-1/3 text-right font-bold print-text">{d.value} ج.م</span>
+                        <span className="w-1/3 text-center print-text">x {d.count.toLocaleString('ar-EG')}</span>
+                        <span className="w-1/3 text-left font-extrabold print-text">{d.total.toLocaleString('ar-EG')}</span>
+                    </div>
+                ));
+
+            // معالج لزر الطباعة اليدوي
+            const handleManualPrint = () => {
+                // تفعيل مربع حوار الطباعة
+                window.print(); 
+                
+                // مسح عرض الطباعة وإعادة تعيين النموذج بعد وقت قصير
+                setTimeout(() => {
+                    resetPrintStateAndForm();
+                }, 500); 
+            };
+
+            return (
+                <div className="print-area p-6 bg-white rounded-xl shadow-lg border-2 border-dashed border-gray-400">
+                    {/* زر الطباعة اليدوي (يختفي عند الطباعة الفعلية) */}
+                    <button 
+                        onClick={handleManualPrint} 
+                        className="hide-on-print mt-2 mb-4 w-full p-3 bg-green-500 text-white rounded-lg font-bold text-lg shadow-md transition-colors hover:bg-green-600 border border-green-700"
+                    >
+                        <i className="fas fa-print ml-2"></i> اضغط للطباعة يدوياً (الحل المضمون)
+                    </button>
+                    
+                    <h2 className="text-2xl font-extrabold text-center text-blue-900 mb-2 border-b-2 border-dashed pb-1">وصل بيان نقدية</h2>
+                    
+                    <div className="text-sm space-y-1 mb-3">
+                        <p className="flex justify-between"><span className="font-semibold">المندوب:</span> <span>{transaction.agentName}</span></p>
+                        <p className="flex justify-between"><span className="font-semibold">التاريخ والوقت:</span> <span>{transaction.timestamp}</span></p>
+                        <p className="flex justify-between text-xs"><span className="font-semibold">رقم العملية:</span> <span>...{transaction.id.substring(transaction.id.length - 8)}</span></p>
+                    </div>
+
+                    <div className="space-y-1 p-2 border-y border-dashed border-gray-500">
+                        <h3 className="text-base font-bold text-center text-blue-700">تفاصيل فئات العد</h3>
+                        {denominationsList}
+                    </div>
+
+                    <div className="bg-blue-900 text-white p-2 flex justify-between items-center mt-3 mb-2 print-total-box">
+                        <span className="text-base font-extrabold">الإجمالي الكلي:</span>
+                        <span className="text-xl font-extrabold">{transaction.grandTotal.toLocaleString('ar-EG')} ج.م</span>
+                    </div>
+
+                    <p className="text-center text-xs text-gray-500 mt-2 border-t border-dashed pt-1">شكراً لاستخدام تطبيق بيان نقدية.</p>
+                </div>
+            );
         };
+
+        // --- مكون علامة تبويب السجل ---
+        const HistoryTab = ({ history, isAuthReady, userId, handleReprint }) => (
+            <div className="p-4 space-y-3">
+                <h2 className="text-xl font-bold text-blue-600 border-b pb-2 mb-4">سجل العمليات المحفوظة</h2>
+
+                {!isAuthReady ? (
+                    <div className="text-center p-8 bg-blue-100 rounded-xl shadow-lg text-blue-700">
+                        <i className="fas fa-spinner fa-spin text-4xl mb-3"></i>
+                        <p className="font-semibold">جاري تحميل نظام التوثيق...</p>
+                        <p className="text-sm">يرجى الانتظار لحين تحميل السجل.</p>
+                    </div>
+                ) : !userId ? (
+                    <div className="text-center p-8 bg-red-100 rounded-xl shadow-lg text-red-700">
+                        <i className="fas fa-ban text-4xl mb-3"></i>
+                        <p className="font-semibold">خطأ في الأذونات!</p>
+                        <p className="text-sm">لم يتم توثيق المستخدم بنجاح. لا يمكن الوصول للبيانات الخاصة بك.</p>
+                    </div>
+                ) : history.length === 0 ? (
+                    <div className="text-center p-8 bg-white rounded-xl shadow-lg text-gray-500">
+                        <i className="fas fa-list-alt text-4xl mb-3 text-gray-400"></i>
+                        <p className="font-semibold">لا يوجد عمليات سابقة محفوظة بعد.</p>
+                        <p className="text-sm">قم بالتبديل إلى "عملية عد جديدة" لحفظ أول بيان.</p>
+                    </div>
+                ) : (
+                    history.map((item, index) => (
+                        <div key={item.id} className="bg-white p-4 rounded-xl shadow-lg border border-l-8 border-blue-500 transition-shadow hover:shadow-xl">
+                            <div className="flex justify-between items-start mb-2">
+                                <div className="text-lg font-extrabold text-blue-900">
+                                    {item.grandTotal.toLocaleString('ar-EG')} ج.م
+                                </div>
+                                <div className="text-xs text-gray-500 text-left">
+                                    <i className="fas fa-user-tag ml-1"></i> {item.agentName}
+                                </div>
+                            </div>
+
+                            <div className="text-sm text-gray-600 border-t pt-2 mt-2">
+                                <div className="flex justify-between">
+                                    <span><i className="fas fa-clock ml-1"></i> التاريخ والوقت:</span>
+                                    <span>{item.timestamp}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span><i className="fas fa-id-badge ml-1"></i> رقم العملية:</span>
+                                    <span>...{item.id.substring(item.id.length - 8)}</span>
+                                </div>
+                            </div>
+
+                            <details className="mt-3">
+                                <summary className="text-blue-500 font-medium cursor-pointer text-sm">تفاصيل الفئات</summary>
+                                <ul className="mt-2 text-sm bg-gray-50 p-3 rounded-lg border">
+                                    {item.denominations.map((d, i) => (
+                                        <li key={i} className="flex justify-between border-b last:border-b-0 py-1">
+                                            <span className="font-semibold text-gray-700">{d.value} ج.م</span>
+                                            <span className="text-gray-600">العدد: {d.count.toLocaleString('ar-EG')}</span>
+                                            <span className="font-bold text-green-700">الإجمالي: {d.total.toLocaleString('ar-EG')}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </details>
+                            
+                            {/* زر الطباعة للسجل */}
+                            <div className="flex justify-end mt-3 border-t pt-3">
+                                <button
+                                    onClick={() => handleReprint(item)}
+                                    className="px-4 py-2 bg-blue-500 text-white rounded-lg font-bold text-sm shadow-md transition-colors hover:bg-blue-600"
+                                >
+                                    <i className="fas fa-print ml-2"></i> طباعة الوصل
+                                </button>
+                            </div>
+                        </div>
+                    ))
+                )}
+            </div>
+        );
+
+
+        // --- مكون التطبيق الرئيسي ---
+        const App = () => {
+            const [agentName, setAgentName] = useState('');
+            const [counts, setCounts] = useState(() =>
+                DENOMINATIONS.reduce((acc, val) => ({ ...acc, [val]: 0 }), {})
+            );
+            const [history, setHistory] = useState([]);
+            const [activeTab, setActiveTab] = useState('count'); // 'count' or 'history'
+            const [isAuthReady, setIsAuthReady] = useState(false);
+            const [userId, setUserId] = useState(null);
+            const [message, setMessage] = useState('');
+            const [transactionToPrint, setTransactionToPrint] = useState(null); 
+
+            // --- 1. التوثيق والتهيئة ---
+            useEffect(() => {
+                if (!auth) {
+                    console.error("Firebase Auth not initialized.");
+                    setIsAuthReady(true); 
+                    setUserId(null); 
+                    return;
+                }
+
+                const handleSignIn = async () => {
+                    try {
+                        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+                        if (initialAuthToken) {
+                            await withRetry(() => signInWithCustomToken(auth, initialAuthToken));
+                        } else {
+                            await withRetry(() => signInAnonymously(auth));
+                        }
+                    } catch (error) {
+                        console.error("Authentication failed during sign-in attempt:", error);
+                    }
+                };
+
+                const unsubscribe = onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        setUserId(user.uid);
+                    } else {
+                        setUserId(null); 
+                        console.warn("Authentication failed or user signed out.");
+                    }
+                    setIsAuthReady(true); 
+                });
+
+                handleSignIn();
+                return () => unsubscribe();
+            }, []);
+
+            // --- 2. الاستماع للسجل في الوقت الحقيقي (Firestore) ---
+            useEffect(() => {
+                if (!isAuthReady || !db || !userId) return;
+
+                const historyCollectionRef = collection(db, 'artifacts', appId, 'users', userId, 'cash_counts');
+                const q = query(historyCollectionRef);
+
+                const unsubscribe = onSnapshot(q, (snapshot) => {
+                    let fetchedHistory = snapshot.docs.map(doc => {
+                        const data = doc.data();
+                        return {
+                            id: doc.id,
+                            ...data,
+                            rawTimestamp: data.timestamp, 
+                            timestamp: data.timestamp?.toDate().toLocaleString('ar-EG', { timeZone: 'Africa/Cairo' }) || 'N/A'
+                        };
+                    });
+                    
+                    // الترتيب حسب التاريخ (الأحدث أولاً)
+                    fetchedHistory.sort((a, b) => {
+                        const timeA = a.rawTimestamp?.toMillis() || 0;
+                        const timeB = b.rawTimestamp?.toMillis() || 0;
+                        return timeB - timeA; 
+                    });
+
+                    setHistory(fetchedHistory);
+                }, (error) => {
+                    console.error("Error listening to history:", error);
+                    setMessage(`خطأ في تحميل السجل: ${error.message}. تأكد من صلاحيات الوصول.`);
+                });
+
+                return () => unsubscribe();
+            }, [isAuthReady, userId]); 
+
+            // --- 3. الحسابات (Memoized) ---
+            const totalDenominations = useMemo(() => {
+                return DENOMINATIONS.map(value => {
+                    const count = counts[value] || 0;
+                    const total = value * count;
+                    return { value, count, total };
+                });
+            }, [counts]);
+
+            const grandTotal = useMemo(() => {
+                return totalDenominations.reduce((acc, item) => acc + item.total, 0);
+            }, [totalDenominations]);
+
+            // --- 4. المعالجات (Handers) ---
+            
+            // معالج لتغيير عدد الفئات
+            const handleCountChange = useCallback((value, inputString) => {
+                if (inputString === '') {
+                    setCounts(prev => (prev[value] !== 0 ? { ...prev, [value]: 0 } : prev));
+                    return;
+                }
+
+                if (!/^\d+$/.test(inputString)) {
+                    return;
+                }
+
+                const parsedCount = parseInt(inputString);
+
+                setCounts(prev => (prev[value] !== parsedCount ? { ...prev, [value]: parsedCount } : prev));
+            }, []);
+
+            // معالج لإعادة تعيين النموذج
+            const resetForm = useCallback(() => {
+                setAgentName('');
+                setCounts(DENOMINATIONS.reduce((acc, val) => ({ ...acc, [val]: 0 }), {}));
+                setMessage('تم إعادة تعيين بيانات العد.');
+            }, []); 
+
+            // معالج لمسح حالة الطباعة وإعادة تعيين النموذج بعد الطباعة
+            const resetPrintStateAndForm = useCallback(() => {
+                setTransactionToPrint(null);
+                setAgentName('');
+                setCounts(DENOMINATIONS.reduce((acc, val) => ({ ...acc, [val]: 0 }), {}));
+                setMessage('تم الانتهاء من الطباعة. تم إعادة تعيين بيانات العد.');
+            }, []);
+
+
+            // معالج للحفظ والطباعة (عملية عد جديدة)
+            const handleSaveAndPrint = useCallback(async () => {
+                if (!db || !userId) {
+                    setMessage('!خطأ في التهيئة أو التوثيق. لا يمكن حفظ البيانات.');
+                    return;
+                }
+
+                if (!agentName.trim()) {
+                    setMessage('!الرجاء إدخال اسم المندوب أولاً');
+                    return;
+                }
+                if (grandTotal === 0) {
+                    setMessage('!الإجمالي الكلي صفر. الرجاء إدخال فئات نقدية');
+                    return;
+                }
+
+                const transactionData = {
+                    agentName: agentName.trim(),
+                    grandTotal,
+                    userId: userId,
+                    denominations: totalDenominations.filter(d => d.count > 0).map(d => ({
+                        value: d.value,
+                        count: d.count,
+                        total: d.total
+                    })),
+                    timestamp: serverTimestamp(),
+                };
+
+                try {
+                    setMessage('جاري حفظ العملية...');
+                    const docRef = await withRetry(() => addDoc(collection(db, 'artifacts', appId, 'users', userId, 'cash_counts'), transactionData));
+                    
+                    const savedTransaction = {
+                        id: docRef.id,
+                        ...transactionData,
+                        timestamp: new Date().toLocaleString('ar-EG', { timeZone: 'Africa/Cairo' }),
+                        userId: userId,
+                    };
+
+                    // تعيين البيانات لعرض نموذج الطباعة
+                    setTransactionToPrint(savedTransaction);
+                    setMessage('تم الحفظ بنجاح! يرجى الآن **الضغط على زر الطباعة الأخضر** الذي ظهر في الوصل.');
+
+                } catch (error) {
+                    console.error("Error saving document:", error);
+                    setMessage(`!فشل الحفظ: ${error.message}`);
+                }
+            }, [userId, agentName, grandTotal, totalDenominations]); 
+
+            // معالج لإعادة طباعة عملية من السجل
+            const handleReprintTransaction = useCallback((transaction) => {
+                const printTransaction = {
+                    ...transaction,
+                    timestamp: transaction.timestamp || 'N/A' 
+                };
+                
+                // تعيين البيانات لعرض نموذج الطباعة
+                setTransactionToPrint(printTransaction);
+                setMessage('جاري إعداد وصل الطباعة للسجل. يرجى **الضغط على زر الطباعة الأخضر**.');
+            }, []);
+
+            // --- المكونات المساعدة ---
+
+            const Header = () => (
+                <div className="p-4 bg-blue-700 text-white shadow-lg">
+                    <h1 className="text-2xl font-bold text-center">بيان نقديه</h1>
+                    <p className="text-xs text-center mt-1 opacity-80">أداة عد النقدية للمناديب</p>
+                </div>
+            );
+
+            const TabButton = ({ tab, label, icon }) => (
+                <button
+                    onClick={() => setActiveTab(tab)}
+                    className={`flex-1 py-3 text-center transition-colors duration-200 ${
+                        activeTab === tab
+                            ? 'bg-blue-600 text-white font-semibold border-b-4 border-yellow-300'
+                            : 'bg-blue-800 text-blue-200 hover:bg-blue-700'
+                    }`}
+                >
+                    <i className={`fas fa-${icon} ml-2`}></i> {label}
+                </button>
+            );
+            
+            return (
+                <div className="min-h-screen bg-gray-100 flex flex-col items-center">
+                    <div className="App-Container w-full max-w-md bg-white shadow-2xl rounded-xl overflow-hidden relative min-h-screen">
+                        
+                        {/* عرض الطباعة المشروط (يظهر فوق كل شيء) */}
+                        {transactionToPrint && (
+                            <div className="print-container absolute z-50 w-full h-full bg-white">
+                                <PrintView 
+                                    transaction={transactionToPrint} 
+                                    resetPrintStateAndForm={resetPrintStateAndForm}
+                                />
+                            </div>
+                        )}
+
+                        {/* المحتوى الرئيسي (يختفي عند الطباعة) */}
+                        <div className={`${transactionToPrint ? 'hidden' : 'block'}`}>
+                            <Header />
+
+                            {/* شريط التنقل (Tabs) */}
+                            <div className="flex justify-around border-t border-b border-blue-900 bg-blue-800 sticky top-0 z-10 hide-on-print">
+                                <TabButton tab="count" label="عملية عد جديدة" icon="calculator" />
+                                <TabButton tab="history" label="سجل العمليات" icon="history" />
+                            </div>
+
+                            {/* منطقة المحتوى */}
+                            <div className="pb-20"> 
+                                {activeTab === 'count' ? (
+                                    <MemoizedCountTab 
+                                        agentName={agentName}
+                                        setAgentName={setAgentName}
+                                        totalDenominations={totalDenominations}
+                                        grandTotal={grandTotal}
+                                        handleCountChange={handleCountChange}
+                                        handleSaveAndPrint={handleSaveAndPrint}
+                                        resetForm={resetForm}
+                                        message={message}
+                                    />
+                                ) : (
+                                    <HistoryTab 
+                                        history={history}
+                                        isAuthReady={isAuthReady}
+                                        userId={userId}
+                                        handleReprint={handleReprintTransaction}
+                                    />
+                                )}
+                            </div>
+
+                            <div className="p-2 text-center text-xs text-gray-400 sticky bottom-0 bg-white border-t hide-on-print">
+                                تم استخدام Firebase Firestore لحفظ البيانات.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // عرض التطبيق
+        ReactDOM.render(<App />, document.getElementById('root'));
     </script>
 </body>
 </html>
